@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaf Segmentation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>Real-time Leaf Segmentation</h1>
+    <div class="container">
+        <div class="camera-container">
+            <video id="video" width="640" height="480" autoplay playsinline></video>
+            <button id="captureBtn">Capture & Segment</button>
+            <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+        </div>
+        <div class="result-container">
+            <h2>Segmented Output</h2>
+            <img id="segmentedImage" src="#" alt="Segmented Leaf" style="display:none;">
+            <p id="messageArea"></p>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
