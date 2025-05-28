@@ -1,0 +1,33 @@
+version: '3.8' # Specifies the version of the Docker Compose file format
+
+services:
+  backend:
+    build:
+      context: ./backend # Specifies the build context is the ./backend directory
+      dockerfile: Dockerfile # Specifies the Dockerfile name (can be omitted if it's 'Dockerfile')
+    ports:
+      - "5000:5000" # Maps port 5000 on the host to port 5000 in the container
+    volumes:
+      # For local development, you might want to mount your code for live-reloading.
+      # However, this can sometimes have issues with dependencies installed in the image
+      # if they have OS-specific compiled components.
+      # For this initial setup, we'll rely on the code copied during the build.
+      # If live reload is strongly desired and works, it can be uncommented:
+      # - ./backend:/app
+      # - ./frontend:/frontend 
+      # Note: The paths inside the container (/app and /frontend) must match
+      # where the Dockerfile copies them and where the application expects them.
+      # The ultralytics library might download models to a cache directory.
+      # To persist these downloads across container restarts, you could add a volume:
+      # - yolov8_cache:/root/.cache/ultralytics # Check actual cache path if needed
+    environment:
+      # You can override or set environment variables here if needed
+      # For example, if you didn't want debug mode from run.py:
+      # - FLASK_DEBUG=False
+      - FLASK_RUN_HOST=0.0.0.0 # Redundant if set in Dockerfile ENV, but good for clarity
+      - FLASK_RUN_PORT=5000   # Same as above
+    # container_name: leaf_segmentation_backend # Optional: give a specific name to the container
+
+# Optional: Define a named volume for caching YOLO models
+# volumes:
+#   yolov8_cache:

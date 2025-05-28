@@ -83,6 +83,62 @@ The project is divided into a `frontend` and a `backend` directory.
     http://127.0.0.1:5000
     ```
 
+## Docker Setup (Local Development)
+
+### Prerequisites
+*   **Docker and Docker Compose:** You need to have Docker Desktop (which includes Docker Compose) installed on your system.
+    *   Download and install from the official Docker website: [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/)
+
+### Using Docker Compose (Recommended)
+Docker Compose is the recommended way to run the application locally as it uses the settings defined in `docker-compose.yml`.
+
+1.  **Build and Run:**
+    Open your terminal, navigate to the project's root directory (where `docker-compose.yml` is located), and run:
+    ```bash
+    docker-compose up --build
+    ```
+    This command will build the Docker image for the backend service (if it doesn't exist or if changes are detected) and then start the service.
+
+2.  **Access the application:**
+    Once the containers are running, the application will be available at:
+    ```
+    http://localhost:5000
+    ```
+
+3.  **Stop the application:**
+    *   To stop the services, press `Ctrl+C` in the terminal where `docker-compose up` is running.
+    *   To remove the containers (and networks created by compose), run:
+        ```bash
+        docker-compose down
+        ```
+
+### Using Docker (Alternative)
+You can also build and run the backend service using Docker commands directly.
+
+1.  **Build the Docker image:**
+    Navigate to the project's root directory in your terminal and run:
+    ```bash
+    docker build -t leaf-segmentation-app ./backend
+    ```
+    This command builds a Docker image from the `backend/Dockerfile` and tags it as `leaf-segmentation-app`.
+
+2.  **Run the Docker container:**
+    Once the image is built, run the following command:
+    ```bash
+    docker run -p 5000:5000 leaf-segmentation-app
+    ```
+    This command starts a container from the `leaf-segmentation-app` image and maps port 5000 on your host to port 5000 in the container.
+
+3.  **Access the application:**
+    The application will be available at:
+    ```
+    http://localhost:5000
+    ```
+
+### Notes on Docker Development
+*   **Code Changes & Live Reloading:** The current Docker setup copies the application code into the image at build time. If you make code changes, you'll need to rebuild the image for them to take effect. For a more dynamic development workflow with live-reloading, you might explore uncommenting and adjusting the `volumes` section in `docker-compose.yml`. Be aware that this can sometimes introduce complexities with dependencies that are compiled or installed differently within the container versus on the host.
+*   **YOLO Model Caching:** The `ultralytics` library downloads YOLO models upon their first use. These models are stored within the container. If you frequently rebuild your containers (without using Docker's build cache effectively), these models will be re-downloaded. To persist these models across container instances, you can uncomment the `yolov8_cache` named volume in `docker-compose.yml`. You may need to verify the exact cache path used by `ultralytics` inside the container (e.g., `/root/.cache/ultralytics` or similar) and adjust the volume mapping if necessary.
+
 ## How it Works (Briefly)
 
 1.  The frontend (`index.html` and `main.js`) accesses the user's webcam and displays the video feed.
