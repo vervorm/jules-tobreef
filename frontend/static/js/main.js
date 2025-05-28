@@ -4,6 +4,8 @@ const captureBtn = document.getElementById('captureBtn');
 const segmentedImage = document.getElementById('segmentedImage');
 const messageArea = document.getElementById('messageArea');
 const context = canvas.getContext('2d');
+const areaPercentageDisplay = document.getElementById('areaPercentage'); // Added
+const uploadCroppedBtn = document.getElementById('uploadCroppedBtn'); // Added
 
 // Access webcam
 async function initCamera() {
@@ -36,24 +38,54 @@ captureBtn.addEventListener('click', async () => {
 
         const result = await response.json();
         
-        if (result.segmented_image_data && result.segmented_image_data !== 'dummy_segmented_data') {
-            // Assuming backend returns base64 image data for the segmented image
-            segmentedImage.src = result.segmented_image_data; 
+        messageArea.textContent = result.message || 'Processing complete.';
+
+        if (result.segmented_image_data) {
+            segmentedImage.src = result.segmented_image_data;
             segmentedImage.style.display = 'block';
-            messageArea.textContent = result.message || 'Processing complete.';
-        } else if (result.segmented_image_data === 'dummy_segmented_data') {
-             messageArea.textContent = result.message || 'Received dummy data from backend.';
-             segmentedImage.style.display = 'none';
         } else {
-            messageArea.textContent = 'Error: No segmented image data received.';
             segmentedImage.style.display = 'none';
+            messageArea.textContent = 'Error: No segmented image data received.';
+        }
+
+        if (result.area_percentage !== undefined) {
+            areaPercentageDisplay.textContent = `Largest object covers: ${result.area_percentage.toFixed(2)}% of image.`;
+        } else {
+            areaPercentageDisplay.textContent = '';
+        }
+
+        if (result.area_exceeds_threshold) {
+            uploadCroppedBtn.style.display = 'block';
+        } else {
+            uploadCroppedBtn.style.display = 'none';
         }
 
     } catch (error) {
         console.error('Error sending image to backend:', error);
         messageArea.textContent = `Error processing image: ${error.message}`;
         segmentedImage.style.display = 'none';
+        areaPercentageDisplay.textContent = '';
+        uploadCroppedBtn.style.display = 'none';
     }
+});
+
+// Add event listener for the new button
+uploadCroppedBtn.addEventListener('click', async () => {
+   messageArea.textContent = 'Upload Cropped Leaf button clicked. Calling placeholder endpoint...';
+   try {
+       const response = await fetch('/upload_cropped_leaf', { 
+           method: 'POST',
+           headers: { // Optional: If your placeholder endpoint expects JSON
+            'Content-Type': 'application/json',
+           },
+            // body: JSON.stringify({ key: 'value' }) // Optional: if you want to send data
+        });
+       const data = await response.json();
+       messageArea.textContent = 'Upload Cropped Leaf: ' + data.message;
+   } catch (err) {
+       messageArea.textContent += ' Error calling placeholder endpoint for upload.';
+       console.error('Error calling /upload_cropped_leaf:', err);
+   }
 });
 
 initCamera();
