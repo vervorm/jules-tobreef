@@ -15,10 +15,10 @@ services:
       # If live reload is strongly desired and works, it can be uncommented:
       # - ./backend:/app
       # - ./frontend:/frontend 
-      # Note: The paths inside the container (/app and /frontend) must match
-      # where the Dockerfile copies them and where the application expects them.
+      #
       # The ultralytics library might download models to a cache directory.
       # To persist these downloads across container restarts, you could add a volume:
+      # (Ensure 'volumes:' above is uncommented and the named volume 'yolov8_cache' below is also defined and uncommented)
       # - yolov8_cache:/root/.cache/ultralytics # Check actual cache path if needed
     environment:
       # You can override or set environment variables here if needed
