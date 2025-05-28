@@ -135,6 +135,69 @@ You can also build and run the backend service using Docker commands directly.
     http://localhost:5000
     ```
 
+### Running on macOS with Colima
+
+If you're a macOS user, Colima provides a lightweight way to run Docker containers. Here's how to set up and run this project using Colima:
+
+1.  **Install Homebrew (if not already installed):**
+    Homebrew is a package manager for macOS. If you don't have it, install it from [https://brew.sh/](https://brew.sh/).
+
+2.  **Install Colima and Docker CLI Tools:**
+    Open your Terminal and run:
+    ```bash
+    brew install colima docker docker-compose
+    ```
+    This installs Colima and the Docker command-line tools that Colima uses.
+
+3.  **Start Colima:**
+    To start Colima with default settings (typically 2 CPUs, 2GB RAM):
+    ```bash
+    colima start
+    ```
+    For better performance, especially for resource-intensive tasks like running machine learning models, consider allocating more resources:
+    ```bash
+    colima start --cpu 4 --memory 8 --disk 100 --vm-type=vz --mount-type=vz # For macOS Sonoma and later with vz and virtiofs
+    # For older macOS versions or different preferences:
+    # colima start --cpu 4 --memory 8 
+    ```
+    Refer to Colima's documentation for the latest recommendations on VM type and mount type for best performance on your macOS version.
+
+4.  **Verify Docker Context:**
+    Colima should automatically set the Docker context. Verify this with:
+    ```bash
+    docker context ls
+    ```
+    The current context should point to `colima`. If not, you might need to run `docker context use colima`.
+
+5.  **Clone The Project Repository:**
+    If you haven't already, clone this project to your Mac and navigate into its directory:
+    ```bash
+    git clone <your-repository-url>
+    cd <project-directory-name>
+    ```
+
+6.  **Run the Application with Docker Compose:**
+    From the project's root directory (where `docker-compose.yml` is located):
+    ```bash
+    docker-compose up --build
+    ```
+    This command will build the Docker image for the backend service and start it.
+
+7.  **Access the Application:**
+    Open your web browser and navigate to `http://localhost:5000`.
+
+8.  **Stopping the Application:**
+    *   In the terminal where `docker-compose up` is running, press `Ctrl+C`.
+    *   To remove the containers and associated networks, run: `docker-compose down`
+
+9.  **Stopping Colima:**
+    When you're done using Docker, you can stop the Colima VM to free up resources:
+    ```bash
+    colima stop
+    ```
+
+This setup allows you to use the Docker configurations provided in this project seamlessly on your Mac via Colima.
+
 ### Notes on Docker Development
 *   **Code Changes & Live Reloading:** The current Docker setup copies the application code into the image at build time. If you make code changes, you'll need to rebuild the image for them to take effect. For a more dynamic development workflow with live-reloading, you might explore uncommenting and adjusting the `volumes` section in `docker-compose.yml`. Be aware that this can sometimes introduce complexities with dependencies that are compiled or installed differently within the container versus on the host.
 *   **YOLO Model Caching:** The `ultralytics` library downloads YOLO models upon their first use. These models are stored within the container. If you frequently rebuild your containers (without using Docker's build cache effectively), these models will be re-downloaded. To persist these models across container instances, you can uncomment the `yolov8_cache` named volume in `docker-compose.yml`. You may need to verify the exact cache path used by `ultralytics` inside the container (e.g., `/root/.cache/ultralytics` or similar) and adjust the volume mapping if necessary.
