@@ -5,6 +5,8 @@ import numpy as np
 import base64
 from io import BytesIO
 from PIL import Image
+import os
+from datetime import datetime
 
 bp = Blueprint('main', __name__)
 
@@ -51,20 +53,41 @@ def predict():
 
 
         # Perform YOLOv8 inference
-        results = model.predict(image_cv, verbose=False) # verbose=False to reduce console output
+        results = model.predict(image_cv, verbose=False, conf=0.5) # Added conf for potentially cleaner output
 
         annotated_image_cv = image_cv.copy() # Default to original if no masks
         area_percentage = 0.0
         largest_mask_area = 0.0
+        
+        # Initialize annotated_image_cv based on whether masks are present
+        if results and results[0].masks is not None and len(results[0].masks.data) > 0:
+            annotated_image_cv = results[0].plot() # This plots masks, boxes, labels
+        else:
+            # If no masks, annotated_image_cv remains a copy of the original image_cv
+            # Or, if you want to ensure it's always the plotted image (even if empty of detections):
+            annotated_image_cv = results[0].plot() # this will return the original image if no detections/masks
+
+        # --- Add image saving logic here ---
+        save_dir = 'saved_segmented_images' # This will be /app/saved_segmented_images in Docker
+        os.makedirs(save_dir, exist_ok=True) # Create directory if it doesn't exist
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f") # Use datetime for unique names
+        filename = f"segmented_{timestamp}.png"
+        save_path = os.path.join(save_dir, filename)
+
+        try:
+            if annotated_image_cv is not None and annotated_image_cv.size > 0 : # Check if image is valid
+                cv2.imwrite(save_path, annotated_image_cv)
+                print(f"INFO: Saved segmented image to {save_path}") # Add a log/print
+            else:
+                print(f"WARNING: Annotated image is empty or invalid. Not saving.")
+        except Exception as e:
+            print(f"ERROR: Could not save image to {save_path}: {e}")
+        # --- End of image saving logic ---
 
         if results and results[0].masks is not None and len(results[0].masks.data) > 0:
-            # Use plot() for drawing masks, boxes, and labels
-            annotated_image_cv = results[0].plot() # Returns a NumPy array (image with plotted results)
-
             image_total_area = image_cv.shape[0] * image_cv.shape[1]
             
-            # results[0].masks.xy are polygons, results[0].masks.data are tensors
-            # For area calculation with cv2.contourArea, polygons are easier.
             for mask_polygon_xy in results[0].masks.xy:
                 current_area = cv2.contourArea(np.array(mask_polygon_xy).astype(np.int32))
                 if current_area > largest_mask_area:
@@ -73,10 +96,10 @@ def predict():
             if image_total_area > 0:
                 area_percentage = (largest_mask_area / image_total_area) * 100
             else:
-                area_percentage = 0 # Avoid division by zero if image area is zero (should not happen)
+                area_percentage = 0 
         else:
             # No masks detected, keep original image and 0 percentage
-            pass # annotated_image_cv is already a copy of original image_cv
+            pass
 
         # Encode the processed image (with or without masks) back to base64
         _, buffer = cv2.imencode('.png', annotated_image_cv)

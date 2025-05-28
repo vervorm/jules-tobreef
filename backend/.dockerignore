@@ -25,3 +25,6 @@ Dockerfile
 
 # Other
 .DS_Store
+
+# Directory for runtime generated images
+saved_segmented_images/

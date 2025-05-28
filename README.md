@@ -239,6 +239,27 @@ This setup allows you to use the Docker configurations provided in this project 
 *   The core segmentation logic is in `backend/app/routes.py` within the `/predict` endpoint. This includes image decoding, YOLOv8 model inference, mask plotting, and area calculation.
 *   A new placeholder endpoint `/upload_cropped_leaf` has been added to `backend/app/routes.py` to demonstrate future functionality.
 
+### Server-Side Image Saving
+*   **Functionality:** Each time a successful prediction is made, the backend automatically saves the processed image (the one with segmentation masks drawn on it) to the server.
+*   **Save Location:** Images are saved in the `backend/saved_segmented_images/` directory. When running inside a Docker container, this path corresponds to `/app/saved_segmented_images/`.
+*   **Filename Convention:** Images are saved with filenames like `segmented_YYYYMMDD_HHMMSS_ffffff.png`, ensuring uniqueness based on the timestamp of processing.
+*   **Docker Persistence for Saved Images:** When running the application with Docker, the `saved_segmented_images/` directory resides within the container. If you stop and remove the container, these saved images will be deleted. To persist these images across container restarts, you can mount a Docker volume or a host directory to `/app/saved_segmented_images/` in your `docker-compose.yml`. For example:
+    ```yaml
+    services:
+      backend:
+        # ... other configurations ...
+        volumes:
+          # Example: Mount a host directory to the container path
+          - ./my_saved_images_on_host:/app/saved_segmented_images 
+          # Or using a named volume (ensure 'saved_images_volume' is defined at the top level):
+          # - saved_images_volume:/app/saved_segmented_images
+
+    # If using a named volume, define it at the top level of docker-compose.yml:
+    # volumes:
+    #   saved_images_volume:
+    ```
+    Replace `./my_saved_images_on_host` with the actual path on your host machine where you want to store the images.
+
 ## Frontend Details
 *   `frontend/templates/index.html` has been updated to include elements for displaying the area percentage and the conditional "Upload Cropped Leaf" button.
 *   `frontend/static/js/main.js` now handles the updated backend response, displays the new information, manages the visibility of the conditional button, and calls the `/upload_cropped_leaf` placeholder endpoint.
