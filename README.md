@@ -234,6 +234,124 @@ This setup allows you to use the Docker configurations provided in this project 
   - **Note on Docker Volumes Syntax:** When uncommenting `volumes` in `docker-compose.yml` for live-reloading, ensure that the `volumes:` key itself is uncommented, and that each volume entry under it is a valid list item (starting with a `- `). Improperly formatted comments or entries under an active `volumes:` key can lead to parsing errors.
 - **YOLO Model Caching:** The `ultralytics` library downloads YOLO models upon their first use. These models are stored within the container. If you frequently rebuild your containers (without using Docker's build cache effectively), these models will be re-downloaded. To persist these models across container instances, you can uncomment the `yolov8_cache` named volume in `docker-compose.yml`. You may need to verify the exact cache path used by `ultralytics` inside the container (e.g., `/root/.cache/ultralytics` or similar) and adjust the volume mapping if necessary.
 
+## Training a Custom Leaf Segmentation Model
+
+### Overview
+
+This section describes how to train a YOLOv8 segmentation model on a custom dataset of leaf images and their corresponding masks. The goal is to create a single-class model specialized in segmenting "leaf" instances.
+
+### Prerequisites for Training
+
+- A Python environment with `ultralytics`, `opencv-python`, and `numpy` installed. These are listed in `backend/requirements.txt`, but ensure they are available in the environment where you run the training scripts.
+- A custom dataset consisting of images of leaves and their corresponding binary segmentation masks.
+
+### Input Dataset Structure (for `prepare_leaf_dataset.py`)
+
+The `scripts/prepare_leaf_dataset.py` script expects your raw images and masks to be organized as follows:
+
+```
+<project_root>/
+├── IMAGES/
+│   └── healthy-infected/  # Or any other parent directory structure you prefer
+│       ├── healthy/       # Subdirectory for one class/type (e.g., img1.jpg, img2.png)
+│       └── infected/      # Subdirectory for another class/type (e.g., img3.jpg)
+└── MASKS/
+    └── healthy-infected/  # This structure should mirror the IMAGES structure
+        ├── healthy/       # (e.g., segmented_img1.jpg)
+        └── infected/      # (e.g., segmented_img3.jpg)
+```
+
+- **Images:** Can be of common types like `.jpg`, `.png`.
+- **Masks:**
+  - Must be binary images where the leaf pixels are white and the background is black.
+  - The naming convention for masks must be `segmented_{original_basename_without_extension}.jpg` (or `.png` if your masks are PNGs, the script currently looks for `.jpg` by default in `get_mask_path` but can be adapted). For example, if an image is `IMAGES/healthy-infected/healthy/leaf_01.jpg`, its mask should be `MASKS/healthy-infected/healthy/segmented_leaf_01.jpg`.
+
+### Step 1: Prepare Dataset
+
+The `scripts/prepare_leaf_dataset.py` script processes your raw images and masks, converting them into the YOLOv8 segmentation format (label files containing normalized polygon coordinates) and splitting them into training and validation sets.
+
+1.  **Organize your data:** Ensure your images and masks are arranged according to the structure described above.
+2.  **Run the preparation script:** From the project's root directory, execute:
+    ```bash
+    python scripts/prepare_leaf_dataset.py --images_dir IMAGES --masks_dir MASKS --output_dir datasets/leaf_segmentation
+    ```
+    - `--images_dir`: Path to your root `IMAGES` directory.
+    - `--masks_dir`: Path to your root `MASKS` directory.
+    - `--output_dir`: Path where the YOLO-formatted dataset will be created.
+      This command will generate the `datasets/leaf_segmentation` directory (or your specified output directory) containing `images/` and `labels/` subdirectories, each further split into `train/` and `val/`.
+
+### Step 2: Dataset Configuration File (`leaf_dataset.yaml`)
+
+The YOLOv8 training process requires a YAML file that describes the dataset paths and class information. The `scripts/prepare_leaf_dataset.py` script does **not** create this YAML file automatically. You need to ensure it exists.
+
+1.  **Create the YAML file:** Create a file named `leaf_dataset.yaml` inside your output directory (e.g., `datasets/leaf_segmentation/leaf_dataset.yaml`).
+2.  **Content:**
+
+    ```yaml
+    path: . # Current directory (datasets/leaf_segmentation)
+    train: images/train # Path to train images (relative to 'path')
+    val: images/val # Path to val images (relative to 'path')
+
+    # Classes
+    nc: 1 # number of classes
+    names: ["leaf"] # class names
+    ```
+
+    - The `path: .` entry means that `images/train` and `images/val` are relative to the directory where `leaf_dataset.yaml` is located (i.e., `datasets/leaf_segmentation/images/train` and `datasets/leaf_segmentation/images/val`).
+
+### Step 3: Run Training
+
+The `scripts/train_leaf_segmentation.py` script uses the prepared dataset and the YAML configuration to train a YOLOv8 segmentation model.
+
+1.  **Run the training script:** From the project's root directory, execute:
+    ```bash
+    python scripts/train_leaf_segmentation.py --data_yaml datasets/leaf_segmentation/leaf_dataset.yaml --base_model yolov8n-seg.pt --epochs 100 --batch_size 4 --img_size 640 --project_name leaf_training_runs --run_name run1
+    ```
+2.  **Key Command-Line Arguments:**
+    - `--data_yaml`: Path to your `leaf_dataset.yaml` file.
+    - `--base_model`: The pre-trained YOLOv8 model to start from (e.g., `yolov8n-seg.pt`, `yolov8s-seg.pt`). Using a pre-trained model is highly recommended for faster convergence and better results.
+    - `--epochs`: Number of training epochs.
+    - `--batch_size`: Number of images processed in each batch. Adjust based on your system's memory (CPU or GPU).
+    - `--img_size`: Image size (height and width) to which images will be resized for training.
+    - `--project_name`: Directory where training runs will be saved.
+    - `--run_name`: Specific name for this particular training experiment.
+3.  **Crucial Note on CPU vs. GPU:**
+    - **Important:** Training on a CPU will be very slow. For effective training, a GPU is highly recommended. If you only have CPU access, start with a very small number of epochs (e.g., 5-10) and a small batch size (e.g., 2-4) to verify the pipeline. Full training on CPU can take many hours or days.
+4.  **Training Output:**
+    - Training progress will be printed to the console.
+    - Results, including model weights and logs, will be saved in a directory structure like `leaf_training_runs/run1/`. The best performing model weights will be saved as `best.pt` within the `weights/` subdirectory (e.g., `leaf_training_runs/run1/weights/best.pt`).
+
+### Step 4: Using the Trained Model
+
+Once training is complete, you can integrate your custom model into the main web application.
+
+1.  **Copy the best model:**
+    Locate the `best.pt` file from your training output (e.g., `leaf_training_runs/run1/weights/best.pt`). Copy this file to `backend/models/custom_leaf_model.pt` (you might need to create the `backend/models/` directory if it doesn't have a `.gitkeep` file from earlier steps and is empty).
+
+2.  **Update Model Path in Backend:**
+    Modify `backend/app/routes.py`. Find the line where the YOLO model is loaded:
+
+    ```python
+    model = YOLO('yolov8n-seg.pt')
+    ```
+
+    Change it to load your custom model. Since `routes.py` is in `backend/app/`, and your model is in `backend/models/`, the relative path from `backend/app/` to `backend/models/` is `../models/`.
+
+    ```python
+    model = YOLO('../models/custom_leaf_model.pt')
+    ```
+
+    Alternatively, ensure the path is correctly resolved from your application's working directory if it differs. Using an absolute path or constructing a path relative to the script location can also be options.
+
+3.  **Rebuild Docker Image (if applicable):**
+    If you are running the application using Docker, you need to rebuild the backend image to include the new model file and the code changes:
+    ```bash
+    docker-compose up --build
+    ```
+    This ensures the Docker container has the latest version of your model and the updated `routes.py`.
+
+After these steps, the web application should use your custom-trained leaf segmentation model for predictions.
+
 ## How it Works (Briefly)
 
 1.  The frontend (`index.html` and `main.js`) accesses the user's webcam and displays the video feed.
@@ -325,12 +443,3 @@ This setup allows you to use the Docker configurations provided in this project 
   - Explore options for deploying to cloud platforms (e.g., AWS, Google Cloud, Heroku).
 
 This README provides a guide to understanding, setting up, and running the application, as well as outlining future development paths.
-
-├── IMAGES/
-│ └── healthy-infected/
-│ ├── healthy
-│ └── infected
-└── SEGMENTED/
-└── healthy-infected/
-├── healthy
-└── infected
